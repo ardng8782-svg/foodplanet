@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>FOOD CONQUEROR</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    :root {
+      --bg-main: #09090B;
+      --bg-card: #141417;
+      --text-main: #FAFAFA;
+      --text-muted: #52525B;
+      --border: rgba(255,255,255,0.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; -webkit-font-smoothing: antialiased; }
+    body { background: #040405; color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+
+    .phone-container {
+      width: 100%; max-width: 430px; height: 96vh; min-height: 740px;
+      background: var(--bg-main); display: flex; flex-direction: column; padding: 20px;
+      border: 1px solid var(--border); border-radius: 28px; overflow-y: auto; position: relative;
+    }
+
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .brand { font-size: 15px; font-weight: 900; color: #38BDF8; cursor: pointer; letter-spacing: 0.5px; }
+    .header-actions { display: flex; gap: 6px; }
+    .btn-icon { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-main); padding: 6px 10px; border-radius: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .btn-icon:hover { background: rgba(255,255,255,0.08); }
+
+    .live-ticker { background: rgba(56,189,248,0.04); border: 1px solid var(--border); padding: 9px 12px; border-radius: 12px; font-size: 11px; color: #38BDF8; display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+    .live-dot { width: 6px; height: 6px; background: #38BDF8; border-radius: 50%; animation: pulse 1.5s infinite; flex-shrink: 0; }
+
+    /* ════════════════════════════
+       PLANET UNIVERSE
+    ════════════════════════════ */
+    .universe-box {
+      background: #05050A;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      position: relative;
+      height: 220px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    /* star field */
+    .universe-box::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 30% 70%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 55% 15%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 70% 55%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 85% 30%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 20% 85%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 45% 45%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 92% 80%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 65% 88%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 8% 50%, rgba(255,255,255,0.3) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .universe-label {
+      position: absolute; top: 10px; left: 14px;
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: #3F3F4A;
+      text-transform: uppercase; z-index: 2;
+    }
+    .universe-total {
+      position: absolute; bottom: 10px; right: 14px;
+      font-size: 10px; font-weight: 700; color: #3F3F4A; z-index: 2;
+    }
+
+    /* planets */
+    .planet {
+      position: absolute;
+      border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.3s ease;
+      z-index: 3;
+      user-select: none;
+    }
+    .planet:hover { transform: scale(1.12) !important; }
+    .planet:active { transform: scale(0.96) !important; }
+    .planet-emoji { line-height: 1; }
+    .planet-name { font-size: 9px; font-weight: 800; color: rgba(255,255,255,0.85); margin-top: 3px; text-align: center; white-space: nowrap; }
+    .planet-count {
+      position: absolute; top: -5px; right: -5px;
+      background: #FAFAFA; color: #09090B;
+      font-size: 9px; font-weight: 900;
+      width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 4;
+    }
+    /* orbit ring on biggest planet */
+    .planet-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.12);
+      pointer-events: none;
+      animation: spin-ring 8s linear infinite;
+    }
+    @keyframes spin-ring { from { transform: rotate(0deg) scaleY(0.3); } to { transform: rotate(360deg) scaleY(0.3); } }
+    @keyframes float-planet {
+      0%,100% { transform: translateY(0px); }
+      50% { transform: translateY(-5px); }
+    }
+
+    /* ════════════════════════════
+       LEADERBOARD (카테고리 랭킹)
+    ════════════════════════════ */
+    .leaderboard { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 14px 18px; max-height: 170px; overflow-y: auto; margin-bottom: 14px; }
+    .leaderboard::-webkit-scrollbar { width: 4px; }
+    .leaderboard::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
+    .rank-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.02); cursor: pointer; }
+    .rank-row:last-child { border: none; }
+    .rank-row:hover { background: rgba(255,255,255,0.02); }
+    .rank-info { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .rank-num { font-size: 11px; font-weight: 800; color: #44444F; width: 14px; }
+    .bar-wrap { width: 70px; height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
+    /* ════════════════════════════
+       UPLOAD
+    ════════════════════════════ */
+    .upload-action-box { margin-top: auto; background: #101014; border: 1px solid var(--border); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .search-input { width: 100%; padding: 13px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 12px; color: white; font-size: 14px; outline: none; }
+    .search-input:focus { border-color: #38BDF8; }
+
+    /* 카테고리 선택 칩 */
+    .cat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cat-chip {
+      padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer;
+      border: 1.5px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: #A1A1AA;
+      transition: all 0.15s;
+    }
+    .cat-chip.selected { color: #09090B; border-color: transparent; }
+    .btn-submit { background: var(--text-main); color: var(--bg-main); border: none; padding: 15px; border-radius: 14px; font-weight: 700; font-size: 14px; cursor: pointer; }
+    #file-input { display: none; }
+
+    /* ════════════════════════════
+       LOCK
+    ════════════════════════════ */
+    .lock-view { text-align: center; padding: 20px 0; margin: auto 0; }
+    .btn-coupang { background: #0074E4; color: white; text-decoration: none; display: block; padding: 16px; border-radius: 14px; font-weight: 800; font-size: 14px; margin: 16px 0 12px 0; }
+    .waiting-box { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.01); padding: 12px; border-radius: 12px; border: 1px dashed var(--border); }
+
+    /* ════════════════════════════
+       REPORT
+    ════════════════════════════ */
+    .certificate-container {
+      width: 100%; height: 300px; border-radius: 20px; border: 1px solid var(--border);
+      position: relative; overflow: hidden; display: flex; flex-direction: column;
+      justify-content: space-between; padding: 20px;
+    }
+    .cert-bg-photo { position: absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; filter:brightness(30%) contrast(110%); z-index:1; }
+    .cert-content { z-index:2; position:relative; height:100%; display:flex; flex-direction:column; justify-content:space-between; }
+    .cert-badge { font-size: 10px; font-weight: 900; color: #38BDF8; }
+    .conquered-stamp {
+      position: absolute; right: 10px; top: 36px; border: 3px solid #EF4444; color: #EF4444;
+      font-size: 18px; font-weight: 900; padding: 5px 12px; transform: rotate(-15deg);
+      border-radius: 8px; text-transform: uppercase; letter-spacing: 2px;
+      animation: stamp-drop 0.3s cubic-bezier(0.175,0.885,0.32,1.275) forwards; z-index: 3; opacity: 0;
+    }
+    .report-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .btn-save-img { background: #1C1C24; color: var(--text-main); border: 1px solid var(--border); padding: 14px; border-radius: 14px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-reset { width: 100%; padding: 14px; background: var(--text-main); color: var(--bg-main); border: none; font-weight: 700; border-radius: 14px; cursor: pointer; font-size: 14px; }
+
+    /* ════════════════════════════
+       COLLAGE
+    ════════════════════════════ */
+    .collage-board {
+      flex: 1; width: 100%; background: #0E0E11; border: 1px solid var(--border);
+      border-radius: 24px; position: relative; overflow: hidden; margin-bottom: 12px; min-height: 300px;
+    }
+    .collage-center-stat {
+      position: absolute; top:50%; left:50%; transform: translate(-50%,-50%);
+      background: rgba(9,9,11,0.9); border: 2px solid var(--border); backdrop-filter: blur(8px);
+      padding: 18px 28px; border-radius: 20px; text-align: center; z-index: 5; pointer-events: none;
+    }
+    .collage-center-stat h2 { font-size: 32px; font-weight: 900; letter-spacing: -1px; margin-top: 4px; }
+    .mini-postit-card {
+      position: absolute; width: 105px; height: 105px; background: #1C1C24;
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.4); z-index: 2; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    .mini-postit-img { position: absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; filter:brightness(45%); z-index:1; }
+    .mini-postit-txt { z-index:2; font-size:9px; font-weight:800; color:white; word-break:break-all; line-height:1.2; }
+    .collage-actions { display: flex; gap: 10px; margin-bottom: 12px; }
+    .collage-actions .btn-save-img { flex: 1; }
+
+    /* ════════════════════════════
+       MY PAGE
+    ════════════════════════════ */
+    .mypage-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .mypage-header h2 { font-size: 18px; font-weight: 900; }
+    .mypage-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+    .stat-label { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .stat-value { font-size: 24px; font-weight: 900; }
+    .section-title { font-size: 11px; font-weight: 800; color: #71717A; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; margin-bottom: 14px; }
+    .history-list::-webkit-scrollbar { width: 4px; }
+    .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
+    .history-item { display: flex; align-items: center; gap: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
+    .history-thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+    .history-info { flex: 1; min-width: 0; }
+    .history-food { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-cat { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .btn-delete { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #EF4444; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .empty-state { text-align: center; padding: 28px 0; color: var(--text-muted); font-size: 13px; }
+    .empty-state .em { font-size: 30px; margin-bottom: 8px; }
+
+    /* ════════════════════════════
+       OVERLAYS
+    ════════════════════════════ */
+    .ai-scanning-overlay {
+      position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(9,9,11,0.96);
+      z-index:100; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:16px; border-radius: 28px;
+    }
+    .scan-line { width:80%; height:2px; background:#38BDF8; box-shadow:0 0 10px #38BDF8; animation:scan-move 1.5s ease-in-out infinite; }
+
+    .screen { flex:1; display:flex; flex-direction:column; }
+    .hidden { display: none !important; }
+    .legal-notice { font-size:9px; color:#44444F; text-align:center; margin-top:12px; flex-shrink:0; }
+
+    @keyframes pulse { 0%{transform:scale(0.9);opacity:0.5} 50%{transform:scale(1.2);opacity:1} 100%{transform:scale(0.9);opacity:0.5} }
+    @keyframes stamp-drop { 0%{transform:scale(3) rotate(-45deg);opacity:0} 100%{transform:scale(1) rotate(-15deg);opacity:1} }
+    @keyframes scan-move { 0%{transform:translateY(-60px)} 50%{transform:translateY(60px)} 100%{transform:translateY(-60px)} }
+  </style>
+</head>
+<body>
+<div class="phone-container">
+
+  <div id="ai-loading-view" class="ai-scanning-overlay">
+    <i data-lucide="shield-check" style="width:40px;height:40px;color:#38BDF8;"></i>
+    <p style="font-size:14px;font-weight:700;">AI 비전 엔진 로드 중...</p>
+    <div style="width:100px;height:4px;background:#27272A;border-radius:2px;overflow:hidden;">
+      <div style="width:100%;height:100%;background:#38BDF8;animation:pulse 1s infinite;"></div>
+    </div>
+  </div>
+
+  <div id="ai-scanning-view" class="ai-scanning-overlay hidden">
+    <div class="scan-line"></div>
+    <i data-lucide="eye" style="width:32px;height:32px;color:#38BDF8;"></i>
+    <p style="font-size:14px;font-weight:700;" id="scan-status-text">이미지 분석 중...</p>
+  </div>
+
+  <header>
+    <div class="brand" onclick="goHome()">FOOD CONQUEROR</div>
+    <div class="header-actions">
+      <button id="mypage-nav-btn" class="btn-icon" onclick="openMyPage()">
+        <i data-lucide="user" style="width:12px;height:12px;"></i>마이페이지
+      </button>
+      <button id="home-nav-btn" class="btn-icon hidden" onclick="goHome()">
+        <i data-lucide="home" style="width:12px;height:12px;"></i>홈
+      </button>
+    </div>
+  </header>
+
+  <div class="live-ticker">
+    <div class="live-dot"></div>
+    <span id="ticker-text">실시간: 음식 우주가 열렸습니다. 첫 행성을 키워보세요!</span>
+  </div>
+
+  <!-- ══ DASHBOARD ══ -->
+  <div id="dashboard-screen" class="screen">
+
+    <!-- 행성 우주 -->
+    <div class="universe-box" id="universe-box">
+      <div class="universe-label">🌌 My Food Universe</div>
+      <div class="universe-total" id="universe-total">총 0그릇</div>
+      <!-- 행성은 JS로 렌더 -->
+    </div>
+
+    <!-- 카테고리 랭킹 -->
+    <div class="leaderboard" id="leaderboard-container"></div>
+
+    <!-- 업로드 -->
+    <div class="upload-action-box">
+      <input type="text" id="food-search" class="search-input" placeholder="이 그릇의 제목을 붙여주세요 (예: 엄마표 된장찌개)">
+      <div class="cat-chips" id="cat-chips-container"></div>
+      <button class="btn-submit" onclick="handleUploadClick()">
+        사진 올리고 행성 키우기 🚀
+      </button>
+      <input type="file" id="file-input" accept="image/*">
+    </div>
+  </div>
+
+  <!-- ══ LOCK ══ -->
+  <div id="lock-screen" class="screen hidden" style="justify-content:center;">
+    <div class="lock-view">
+      <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">📊 AI 분석 완료</h2>
+      <p style="font-size:12px;color:var(--text-muted);line-height:1.6;padding:0 10px;" id="lock-desc">분석 중...</p>
+      <a href="https://link.coupang.com/a/eJcD3sYKE8" target="_blank" id="coupang-btn" class="btn-coupang">
+        🛒 쿠팡 열고 결과창 확인하기
+      </a>
+      <div class="waiting-box"><span id="wait-status">링크 터치 대기 중...</span></div>
+    </div>
+  </div>
+
+  <!-- ══ REPORT ══ -->
+  <div id="report-screen" class="screen hidden" style="justify-content:center;">
+    <div id="cert-capture-zone" class="certificate-container">
+      <img id="user-cert-photo" class="cert-bg-photo" src="" alt="" crossorigin="anonymous">
+      <div class="conquered-stamp">Conquered</div>
+      <div class="cert-content">
+        <div class="cert-badge">MISSION ACCOMPLISHED · FOOD CONQUEROR</div>
+        <div>
+          <h1 style="font-size:20px;font-weight:900;line-height:1.3;" id="final-title">점령 완료</h1>
+          <p style="font-size:11px;color:#A1A1AA;margin-top:6px;" id="final-desc"></p>
+        </div>
+      </div>
+    </div>
+    <div class="report-actions">
+      <button class="btn-save-img" onclick="saveCertImage()">
+        <i data-lucide="download" style="width:16px;height:16px;"></i>인증카드 이미지로 저장
+      </button>
+      <button class="btn-reset" onclick="goHome()">대시보드로 돌아가기</button>
+    </div>
+  </div>
+
+  <!-- ══ COLLAGE ══ -->
+  <div id="collage-screen" class="screen hidden">
+    <div class="collage-board" id="collage-pins-wall">
+      <div class="collage-center-stat">
+        <p id="collage-cat-label" style="font-size:11px;font-weight:800;margin-bottom:2px;"></p>
+        <h2 id="collage-total-dishes">0그릇</h2>
+      </div>
+    </div>
+    <div class="collage-actions">
+      <button class="btn-save-img" onclick="saveCollageImage()">
+        <i data-lucide="download" style="width:16px;height:16px;"></i>콜라주 이미지 저장
+      </button>
+    </div>
+    <button class="btn-reset" onclick="closeCollage()">닫기</button>
+  </div>
+
+  <!-- ══ MY PAGE ══ -->
+  <div id="mypage-screen" class="screen hidden">
+    <div class="mypage-header">
+      <h2>마이페이지</h2>
+      <button class="btn-icon" onclick="goHome()"><i data-lucide="x" style="width:12px;height:12px;"></i>닫기</button>
+    </div>
+    <div class="mypage-stats" style="grid-template-columns:1fr;">
+      <div class="stat-card">
+        <div class="stat-label">총 정복 그릇</div>
+        <div class="stat-value" id="my-total-count">0</div>
+      </div>
+    </div>
+    <div class="section-title">내 정복 히스토리</div>
+    <div class="history-list" id="history-list-container"></div>
+    <div class="section-title">전체 콜라주</div>
+    <button class="btn-save-img" onclick="openAllCollage()" style="margin-bottom:14px;">
+      <i data-lucide="layout-grid" style="width:16px;height:16px;"></i>내가 올린 모든 음식 콜라주 보기
+    </button>
+    <div class="section-title">카테고리별 콜라주 저장</div>
+    <div id="mypage-cat-btns" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+    <button class="btn-reset" onclick="goHome()">홈으로 돌아가기</button>
+  </div>
+
+  <div class="legal-notice">이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</div>
+</div>
+
+<img id="hidden-img" src="" alt="" style="display:none;">
+
+<script>
+  lucide.createIcons();
+
+  /* ── CATEGORIES ── */
+  const CATS = [
+    { key:'korean',  label:'한식',   emoji:'🍚', color:'#38BDF8', glow:'rgba(56,189,248,0.35)' },
+    { key:'chicken', label:'치킨',   emoji:'🍗', color:'#FBBF24', glow:'rgba(251,191,36,0.35)' },
+    { key:'pizza',   label:'피자',   emoji:'🍕', color:'#F97316', glow:'rgba(249,115,22,0.35)' },
+    { key:'burger',  label:'버거',   emoji:'🍔', color:'#EF4444', glow:'rgba(239,68,68,0.35)'  },
+    { key:'chinese', label:'중식',   emoji:'🍜', color:'#A855F7', glow:'rgba(168,85,247,0.35)' },
+    { key:'japanese',label:'일식',   emoji:'🍣', color:'#FB7185', glow:'rgba(251,113,133,0.35)'},
+    { key:'dessert', label:'디저트', emoji:'🍰', color:'#34D399', glow:'rgba(52,211,153,0.35)' },
+    { key:'snack',   label:'분식',   emoji:'🥟', color:'#6366F1', glow:'rgba(99,102,241,0.35)' },
+    { key:'etc',     label:'기타',   emoji:'🍱', color:'#A1A1AA', glow:'rgba(161,161,170,0.35)' },
+  ];
+
+  /* planet positions [cx%, cy%] — fixed layout so they don't overlap */
+  const PLANET_POSITIONS = [
+    [15, 50], [33, 22], [55, 58], [76, 25],
+    [88, 62], [48, 82], [8,  18], [68, 12], [90, 18]
+  ];
+
+  /* ── STATE ── */
+  let scores = {};
+  let collageDB = {};
+  let myHistory = [];
+  CATS.forEach(c => { scores[c.key] = 0; collageDB[c.key] = []; });
+
+  let collageOpenedFrom = 'home'; // 'home' | 'mypage'
+  let visionModel = null;
+
+  /* ── DOM ── */
+  const dScreen  = document.getElementById('dashboard-screen');
+  const lScreen  = document.getElementById('lock-screen');
+  const rScreen  = document.getElementById('report-screen');
+  const cScreen  = document.getElementById('collage-screen');
+  const mpScreen = document.getElementById('mypage-screen');
+  const homeBtn  = document.getElementById('home-nav-btn');
+  const mpBtn    = document.getElementById('mypage-nav-btn');
+  const fileInput = document.getElementById('file-input');
+
+  function hideAll() { [dScreen,lScreen,rScreen,cScreen,mpScreen].forEach(s=>s.classList.add('hidden')); }
+
+  /* ── INIT ── */
+  async function initAI() {
+    try { visionModel = await mobilenet.load(); } catch(e) {}
+    document.getElementById('ai-loading-view').classList.add('hidden');
+    buildCatChips();
+    renderUniverse();
+    renderLeaderboard();
+  }
+
+  /* ── CATEGORY CHIPS ── */
+  function buildCatChips() {
+    const wrap = document.getElementById('cat-chips-container');
+    wrap.innerHTML = '';
+    CATS.forEach(c => {
+      const chip = document.createElement('div');
+      chip.className = 'cat-chip';
+      chip.dataset.key = c.key;
+      chip.innerHTML = `${c.emoji} ${c.label}`;
+      chip.onclick = () => selectCat(c.key);
+      wrap.appendChild(chip);
+    });
+  }
+
+  function selectCat(key) {
+    selectedCat = key;
+    document.querySelectorAll('.cat-chip').forEach(el => {
+      const c = CATS.find(c=>c.key===el.dataset.key);
+      if(el.dataset.key === key) {
+        el.classList.add('selected');
+        el.style.background = c.color;
+      } else {
+        el.classList.remove('selected');
+        el.style.background = '';
+      }
+    });
+  }
+
+  /* ── PLANET UNIVERSE ── */
+  function renderUniverse() {
+    const box = document.getElementById('universe-box');
+    // remove old planets
+    box.querySelectorAll('.planet').forEach(el=>el.remove());
+
+    const total = Object.values(scores).reduce((a,b)=>a+b,0);
+    document.getElementById('universe-total').innerText = `총 ${total}그릇`;
+
+    const maxScore = Math.max(...Object.values(scores), 1);
+
+    CATS.forEach((c, i) => {
+      const score = scores[c.key];
+      const ratio = score / maxScore;
+      // size: 36px base, grows to 72px
+      const size = Math.round(36 + ratio * 36);
+      const [cx, cy] = PLANET_POSITIONS[i];
+
+      const planet = document.createElement('div');
+      planet.className = 'planet';
+      planet.style.width = size + 'px';
+      planet.style.height = size + 'px';
+      planet.style.left = `calc(${cx}% - ${size/2}px)`;
+      planet.style.top  = `calc(${cy}% - ${size/2}px)`;
+      planet.style.background = `radial-gradient(circle at 35% 35%, ${c.color}99, ${c.color}33)`;
+      planet.style.boxShadow = score > 0 ? `0 0 ${8 + ratio*16}px ${c.glow}` : 'none';
+      planet.style.animation = `float-planet ${3 + i*0.4}s ease-in-out infinite`;
+      planet.style.animationDelay = `${i * 0.3}s`;
+      planet.onclick = () => openCollage(c.key);
+
+      const emojiSize = Math.round(14 + ratio * 10);
+      planet.innerHTML = `<span class="planet-emoji" style="font-size:${emojiSize}px;">${c.emoji}</span>`;
+
+      if(size >= 50) {
+        planet.innerHTML += `<span class="planet-name">${c.label}</span>`;
+      }
+      if(score > 0) {
+        const badge = document.createElement('div');
+        badge.className = 'planet-count';
+        badge.innerText = score;
+        planet.appendChild(badge);
+      }
+      // ring on the biggest planet
+      if(score === maxScore && score > 0) {
+        const ring = document.createElement('div');
+        ring.className = 'planet-ring';
+        ring.style.width = (size + 14) + 'px';
+        ring.style.height = (size + 14) + 'px';
+        ring.style.left = '-7px'; ring.style.top = '-7px';
+        planet.appendChild(ring);
+      }
+
+      box.appendChild(planet);
+    });
+  }
+
+  /* ── LEADERBOARD ── */
+  function renderLeaderboard() {
+    const sorted = [...CATS].map(c=>({...c, score: scores[c.key]})).sort((a,b)=>b.score-a.score);
+    const total = Object.values(scores).reduce((a,b)=>a+b,0);
+    const lb = document.getElementById('leaderboard-container');
+    lb.innerHTML = '';
+    sorted.forEach((c, i) => {
+      const ratio = total===0 ? 0 : c.score/total;
+      const row = document.createElement('div');
+      row.className = 'rank-row';
+      row.onclick = () => openCollage(c.key);
+      row.innerHTML = `
+        <div class="rank-info">
+          <span class="rank-num">${i+1}</span>
+          <span style="font-size:15px;">${c.emoji}</span>
+          <span style="font-size:13px;">${c.label}</span>
+          <span style="font-size:11px;color:#71717A;margin-left:2px;">${c.score}그릇</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(ratio*100)}%;background:${c.color};"></div></div>
+          <span style="font-size:11px;color:${c.color};font-weight:700;width:28px;text-align:right;">${Math.round(ratio*100)}%</span>
+        </div>
+      `;
+      lb.appendChild(row);
+    });
+  }
+
+  function refreshAll() { renderUniverse(); renderLeaderboard(); }
+
+  /* ── UPLOAD ── */
+  function handleUploadClick() {
+    const food = document.getElementById('food-search').value.trim();
+    if(!food) { alert('이 그릇의 제목을 먼저 입력해주세요!'); return; }
+    if(!selectedCat) { alert('카테고리를 선택해주세요!'); return; }
+    fileInput.click();
+  }
+
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    currentFood = document.getElementById('food-search').value.trim();
+    localPhotoURL = URL.createObjectURL(file);
+    const hiddenImg = document.getElementById('hidden-img');
+    hiddenImg.src = localPhotoURL;
+
+    hiddenImg.onload = async () => {
+      document.getElementById('ai-scanning-view').classList.remove('hidden');
+      document.getElementById('scan-status-text').innerText = 'AI 이미지 검증 중...';
+
+      let isFood = true;
+      if(visionModel) {
+        const foodKeywords = ["food","dish","meal","soup","pizza","cake","bread","dessert","meat","fast food","vegetable","fruit","bun","cuisine","bakery","sandwich","burger","taco","hotdog"];
+        const preds = await visionModel.classify(hiddenImg);
+        isFood = preds.some(p => foodKeywords.some(kw => p.className.toLowerCase().includes(kw)));
+      }
+
+      if(!isFood) {
+        document.getElementById('ai-scanning-view').classList.add('hidden');
+        const ok = confirm(`🤖 AI 안내:\n이미지에서 음식을 인식하지 못했습니다.\n[${currentFood}] 음식 사진이 맞나요?`);
+        if(!ok) { goHome(); return; }
+        document.getElementById('ai-scanning-view').classList.remove('hidden');
+      }
+
+      document.getElementById('scan-status-text').innerText = '카테고리 분석 완료!';
+      await new Promise(r=>setTimeout(r,600));
+      document.getElementById('ai-scanning-view').classList.add('hidden');
+
+      document.getElementById('user-cert-photo').src = localPhotoURL;
+      hideAll();
+      lScreen.classList.remove('hidden');
+      homeBtn.classList.remove('hidden');
+
+      const cat = CATS.find(c=>c.key===selectedCat);
+      document.getElementById('lock-desc').innerHTML =
+        `🤖 이미지 검증 통과!<br><strong style="color:${cat.color}">${cat.emoji} ${cat.label}</strong> 행성에 등록 확정!<br><br>아래 링크를 확인하시면 승전 인증 카드가 해제됩니다.`;
+    };
+  });
+
+  document.getElementById('coupang-btn').addEventListener('click', () => {
+    isCoupangClicked = true;
+    document.getElementById('wait-status').innerText = '인증 완료! 결과 창으로 이동 중... ⏳';
+    setTimeout(triggerConquestSuccess, 1500);
+  });
+
+  function triggerConquestSuccess() {
+    if(!isCoupangClicked) return;
+    scores[selectedCat] += 1;
+    collageDB[selectedCat].push({ imgSrc: localPhotoURL, foodName: currentFood });
+    myHistory.unshift({ id: Date.now(), foodName: currentFood, catKey: selectedCat, imgSrc: localPhotoURL });
+    refreshAll();
+
+    const cat = CATS.find(c=>c.key===selectedCat);
+    document.getElementById('final-title').innerHTML = `${cat.emoji} [${currentFood}]<br>${cat.label} 행성을 키웠습니다!`;
+    document.getElementById('final-desc').innerText = `${cat.label} 행성: 현재 ${scores[selectedCat]}그릇 누적`;
+    document.getElementById('ticker-text').innerText = `실시간: 누군가 [${currentFood}]을 바쳐 ${cat.emoji} ${cat.label} 행성을 키웠습니다!`;
+
+    hideAll();
+    rScreen.classList.remove('hidden');
+    lucide.createIcons();
+  }
+
+  /* ── COLLAGE ── */
+  function openCollage(catKey, from='home') {
+    collageOpenedFrom = from;
+    hideAll();
+    cScreen.classList.remove('hidden');
+    homeBtn.classList.remove('hidden');
+
+    const cat = CATS.find(c=>c.key===catKey);
+    const label = document.getElementById('collage-cat-label');
+    label.innerText = `${cat.emoji} ${cat.label}`;
+    label.style.color = cat.color;
+    document.getElementById('collage-total-dishes').innerText = `${scores[catKey]}그릇`;
+
+    const wall = document.getElementById('collage-pins-wall');
+    wall.querySelectorAll('.mini-postit-card').forEach(el=>el.remove());
+
+    collageDB[catKey].forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = 'mini-postit-card';
+      card.style.left = `${Math.floor(Math.random()*240)+10}px`;
+      card.style.top  = `${Math.floor(Math.random()*200)+20}px`;
+      card.style.transform = `rotate(${Math.floor(Math.random()*40)-20}deg)`;
+      card.style.zIndex = idx+1;
+      card.innerHTML = `<img class="mini-postit-img" src="${item.imgSrc}"><div class="mini-postit-txt">⚔️ ${item.foodName}</div>`;
+      wall.appendChild(card);
+    });
+
+    lucide.createIcons();
+  }
+
+  /* ── IMAGE SAVE ── */
+  async function saveCertImage() {
+    try {
+      const canvas = await html2canvas(document.getElementById('cert-capture-zone'), { useCORS:true, backgroundColor:'#09090B', scale:2 });
+      const a = document.createElement('a');
+      a.download = `food-conqueror-${currentFood}-${Date.now()}.png`;
+      a.href = canvas.toDataURL('image/png'); a.click();
+    } catch(e) { alert('이미지 저장 중 오류가 발생했습니다.'); }
+  }
+
+  async function saveCollageImage() {
+    try {
+      const canvas = await html2canvas(document.getElementById('collage-pins-wall'), { useCORS:true, backgroundColor:'#0E0E11', scale:2 });
+      const label = document.getElementById('collage-cat-label').innerText;
+      const a = document.createElement('a');
+      a.download = `food-conqueror-collage-${label}-${Date.now()}.png`;
+      a.href = canvas.toDataURL('image/png'); a.click();
+    } catch(e) { alert('이미지 저장 중 오류가 발생했습니다.'); }
+  }
+
+  /* ── MY PAGE ── */
+  function openMyPage() {
+    hideAll();
+    mpScreen.classList.remove('hidden');
+    homeBtn.classList.remove('hidden');
+    mpBtn.classList.add('hidden');
+
+    document.getElementById('my-total-count').innerText = myHistory.length;
+
+    const list = document.getElementById('history-list-container');
+    list.innerHTML = '';
+    if(myHistory.length === 0) {
+      list.innerHTML = `<div class="empty-state"><div class="em">🍽️</div>아직 기록이 없어요!<br>첫 번째 음식을 올려보세요.</div>`;
+    } else {
+      myHistory.forEach(item => {
+        const cat = CATS.find(c=>c.key===item.catKey);
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `
+          <img class="history-thumb" src="${item.imgSrc}" alt="${item.foodName}">
+          <div class="history-info">
+            <div class="history-food">${item.foodName}</div>
+            <div class="history-cat">${cat.emoji} ${cat.label}</div>
+          </div>
+          <button class="btn-delete" onclick="deleteHistory(${item.id})">
+            <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
+          </button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    const catBtns = document.getElementById('mypage-cat-btns');
+    catBtns.innerHTML = '';
+    CATS.forEach(c => {
+      if(collageDB[c.key].length === 0) return;
+      const btn = document.createElement('button');
+      btn.className = 'btn-icon';
+      btn.style.fontSize = '12px';
+      btn.innerHTML = `${c.emoji} ${c.label} (${scores[c.key]}그릇)`;
+      btn.onclick = () => openCollage(c.key, 'mypage');
+      catBtns.appendChild(btn);
+    });
+    if(CATS.every(c=>collageDB[c.key].length===0)) {
+      catBtns.innerHTML = `<p style="font-size:12px;color:var(--text-muted);">정복한 카테고리가 없습니다.</p>`;
+    }
+
+    lucide.createIcons();
+  }
+
+  /* ── 전체 콜라주 ── */
+  function openAllCollage() {
+    if(myHistory.length === 0) { alert('아직 올린 음식이 없어요!'); return; }
+    collageOpenedFrom = 'mypage';
+
+    hideAll();
+    cScreen.classList.remove('hidden');
+    homeBtn.classList.remove('hidden');
+
+    const label = document.getElementById('collage-cat-label');
+    label.innerText = '🌌 전체 음식';
+    label.style.color = '#38BDF8';
+    document.getElementById('collage-total-dishes').innerText = `${myHistory.length}그릇`;
+
+    const wall = document.getElementById('collage-pins-wall');
+    wall.querySelectorAll('.mini-postit-card').forEach(el=>el.remove());
+
+    myHistory.forEach((item, idx) => {
+      const cat = CATS.find(c=>c.key===item.catKey);
+      const card = document.createElement('div');
+      card.className = 'mini-postit-card';
+      card.style.left = `${Math.floor(Math.random()*240)+10}px`;
+      card.style.top  = `${Math.floor(Math.random()*200)+20}px`;
+      card.style.transform = `rotate(${Math.floor(Math.random()*40)-20}deg)`;
+      card.style.zIndex = idx+1;
+      card.innerHTML = `<img class="mini-postit-img" src="${item.imgSrc}"><div class="mini-postit-txt">${cat.emoji} ${item.foodName}</div>`;
+      wall.appendChild(card);
+    });
+
+    lucide.createIcons();
+  }
+
+  function deleteHistory(id) {
+    const item = myHistory.find(h=>h.id===id);
+    if(!item || !confirm(`[${item.foodName}] 기록을 삭제할까요?`)) return;
+    if(scores[item.catKey] > 0) scores[item.catKey] -= 1;
+    const idx = collageDB[item.catKey].findIndex(c=>c.imgSrc===item.imgSrc);
+    if(idx > -1) collageDB[item.catKey].splice(idx, 1);
+    myHistory = myHistory.filter(h=>h.id!==id);
+    refreshAll();
+    openMyPage();
+  }
+
+  function closeCollage() {
+    if(collageOpenedFrom === 'mypage') { openMyPage(); }
+    else { goHome(); }
+  }
+
+  /* ── HOME ── */
+  function goHome() {
+    document.getElementById('food-search').value = '';
+    fileInput.value = ''; isCoupangClicked = false; selectedCat = '';
+    document.querySelectorAll('.cat-chip').forEach(el=>{ el.classList.remove('selected'); el.style.background=''; });
+    document.getElementById('wait-status').innerText = '링크 터치 대기 중...';
+    hideAll();
+    dScreen.classList.remove('hidden');
+    homeBtn.classList.add('hidden');
+    mpBtn.classList.remove('hidden');
+  }
+
+  initAI();
+</script>
+</body>
+</html>
